@@ -29,4 +29,14 @@ canvas {
       margin: 0.2em;
     }
   }
+}#status {position:fixed;bottom:12px;left:16px;margin:0;padding:8px 12px;background:#101722e8;color:#eaf0f7;font:13px system-ui;max-width:calc(100vw - 50px);pointer-events:none}
+#diagnostics {position:fixed;left:16px;top:90px;max-height:45vh;max-width:min(600px,80vw);overflow:auto;background:#101722e8;color:#d5e5fa;font:11px monospace;white-space:pre-wrap}
+#diagnostics:empty {display:none}
+@media (max-width: 600px) {
+  .console {top:12px;left:16px;margin:0;max-width:calc(100vw - 32px);font:12px system-ui}
+  .console #log {display:none}
+  .tp-dfwv {top:42px !important;left:16px !important;right:auto !important;width:calc(100vw - 32px) !important}
+  #webgpu-canvas {position:absolute;top:340px;height:calc(100dvh - 340px);min-height:160px}
+  #diagnostics {top:auto;bottom:70px;max-height:28vh;max-width:calc(100vw - 48px)}
+  #status {font-size:11px;bottom:8px}
 }

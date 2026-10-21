@@ -13,19 +13,9 @@ const c_size_3d_gaussian =
 
 export type PointCloud = Awaited<ReturnType<typeof load>>;
 
-export async function load(file: string, device: GPUDevice) {
-  const blob = new Blob([file]);
-  const arrayBuffer = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    
-    reader.onload = function(event) {
-      resolve(event.target.result);  // Resolve the promise with the ArrayBuffer
-    };
-
-    reader.onerror = reject;  // Reject the promise in case of an error
-    reader.readAsArrayBuffer(blob);
-  });
-
+export async function load(file: string | Blob | ArrayBuffer, device: GPUDevice) {
+  if (file instanceof Blob && file.size>256*1024*1024) throw new Error('PLY exceeds the 256 MiB local scene limit');
+  const arrayBuffer = file instanceof ArrayBuffer ? file : await (file instanceof Blob ? file : new Blob([file])).arrayBuffer();
   const [vertexCount, propertyTypes, vertexData] = decodeHeader(arrayBuffer as ArrayBuffer);
   // figure out the SH degree from the number of coefficients
   var nRestCoeffs = 0;
@@ -54,7 +44,18 @@ export async function load(file: string, device: GPUDevice) {
       }
   }
 
+  for (const name of shFeatureOrder) {
+    if (propertyTypes[name] !== 'float') throw new Error('Missing SH float property: '+name);
+  }
   const num_points = vertexCount;
+  if (num_points*96 > device.limits.maxStorageBufferBindingSize || num_points*96 > device.limits.maxBufferSize) throw new Error('Scene exceeds adapter storage limits');
+  // Validate the entire trust boundary before allocating GPU resources.
+  let checkedOffset=0;
+  for (let i=0;i<num_points;i++) {
+    const [next,v]=readRawVertex(checkedOffset,vertexData,propertyTypes); checkedOffset=next;
+    if (Math.hypot(v.rot_0,v.rot_1,v.rot_2,v.rot_3)<1e-8) throw new Error('Zero quaternion');
+    if ([v.scale_0,v.scale_1,v.scale_2].some(s=>s < -20 || s > 10)) throw new Error('Unsupported log scale range');
+  }
 
   log(`num points: ${num_points}`);
   log(`processing loaded attributes...`);

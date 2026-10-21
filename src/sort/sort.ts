@@ -13,6 +13,7 @@ import { align } from '../utils/util';
 
 export interface SortStuff {
   sort: (encoder: GPUCommandEncoder) => void,
+  destroy: () => void,
   sort_info_buffer: GPUBuffer,
   sort_dispatch_indirect_buffer: GPUBuffer,
 
@@ -29,7 +30,7 @@ function create_ping_pong_buffer(adjusted_count: number, keysize: number, device
     // payload
     sort_indices_buffer: device.createBuffer({
       label: 'ping pong sort indices',
-      size: keysize * 4,
+      size: adjusted_count * 4,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
     }),
     // key
@@ -362,5 +363,9 @@ export function get_sorter(keysize: number, device: GPUDevice): SortStuff {
     ping_pong,
 
     sort,
+    destroy: () => {
+      sort_info_buffer.destroy(); sort_dispatch_indirect_buffer.destroy(); histogram_buffer.destroy();
+      ping_pong.forEach(p => { p.sort_depths_buffer.destroy(); p.sort_indices_buffer.destroy(); });
+    },
   };
 }

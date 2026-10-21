@@ -1,90 +1,43 @@
-export function decodeHeader(plyArrayBuffer: ArrayBuffer): [number, Record<string, string>, DataView] {
-    /* decodes the .ply file header and returns a tuple of:
-        * - vertexCount: number of vertices in the point cloud
-        * - propertyTypes: a map from property names to their types
-        * - vertexData: a DataView of the vertex data
-    */
-
-    const decoder = new TextDecoder();
-    let headerOffset = 0;
-    let headerText = '';
-
-    while (true) {
-        const headerChunk = new Uint8Array(plyArrayBuffer, headerOffset, 50);
-        headerText += decoder.decode(headerChunk);
-        headerOffset += 50;
-
-        if (headerText.includes('end_header')) {
-            break;
+export function decodeHeader(buffer: ArrayBuffer): [number, Record<string,string>, DataView] {
+    if (buffer.byteLength > 256*1024*1024) throw new Error('PLY exceeds the 256 MiB local scene limit');
+    const bytes=new Uint8Array(buffer);
+    const text=new TextDecoder().decode(bytes.subarray(0,Math.min(bytes.length,65536)));
+    const end=/end_header\r?\n/.exec(text);
+    if (!end || !text.startsWith('ply\n') && !text.startsWith('ply\r\n')) throw new Error('Missing PLY header');
+    const lines=text.slice(0,end.index).split(/\r?\n/);
+    if (!lines.includes('format binary_little_endian 1.0')) throw new Error('Only binary little endian PLY is supported');
+    let count=0; let inVertex=false; let stride=0;
+    const properties: Record<string,string>={};
+    for (const line of lines) {
+        if (line.startsWith('element ')) {
+            const match=/^element vertex (\d+)$/.exec(line);
+            inVertex=!!match;
+            if (match) count=Number(match[1]);
+            else if (count===0) throw new Error('Vertex must be the first PLY element');
+        } else if (line.startsWith('property ') && inVertex) {
+            const match=/^property (float|uchar) (\w+)$/.exec(line);
+            if (!match || properties[match[2]]) throw new Error('Unsupported or duplicate PLY vertex property');
+            properties[match[2]]=match[1]; stride+=match[1]==='float'?4:1;
         }
     }
-
-    const headerLines = headerText.split('\n');
-
-    let vertexCount = 0;
-    let propertyTypes: Record<string, string> = {};
-
-    for (let i = 0; i < headerLines.length; i++) {
-        const line = headerLines[i].trim();
-        if (line.startsWith('element vertex')) {
-            const vertexCountMatch = line.match(/\d+/);
-            if (vertexCountMatch) {
-                vertexCount = parseInt(vertexCountMatch[0]);
-            }
-        } else if (line.startsWith('property')) {
-            const propertyMatch = line.match(/(\w+)\s+(\w+)\s+(\w+)/);
-            if (propertyMatch) {
-                const propertyType = propertyMatch[2];
-                const propertyName = propertyMatch[3];
-                propertyTypes[propertyName] = propertyType;
-            }
-        } else if (line === 'end_header') {
-            break;
-        }
+    const offset=new TextEncoder().encode(text.slice(0,end.index+end[0].length)).length;
+    if (!Number.isSafeInteger(count) || count<1 || count>1000000 || !stride || count*stride>buffer.byteLength-offset) throw new Error('Invalid or truncated PLY vertex data (limit 1 million points)');
+    for (const name of ['x','y','z','opacity','rot_0','rot_1','rot_2','rot_3','scale_0','scale_1','scale_2','f_dc_0','f_dc_1','f_dc_2']) {
+        if (properties[name]!=='float') throw new Error('Missing float property: '+name);
     }
-
-    const vertexByteOffset = headerText.indexOf('end_header') + 'end_header'.length + 1;
-    const vertexData = new DataView(plyArrayBuffer, vertexByteOffset);
-
-    return [
-        vertexCount,
-        propertyTypes,
-        vertexData,
-    ];
+    return [count,properties,new DataView(buffer,offset,count*stride)];
 }
 
-export function readRawVertex(offset: number, vertexData: DataView, propertyTypes: Record<string, string>): [number, Record<string, number>] {
-    /* reads a single vertex from the vertexData DataView and returns a tuple of:
-        * - offset: the offset of the next vertex in the vertexData DataView
-        * - rawVertex: a map from property names to their values
-    */
-    let rawVertex: Record<string, number> = {};
-
-    for (const property in propertyTypes) {
-        const propertyType = propertyTypes[property];
-        if (propertyType === 'float') {
-            rawVertex[property] = vertexData.getFloat32(offset, true);
-            offset += Float32Array.BYTES_PER_ELEMENT;
-        } else if (propertyType === 'uchar') {
-            rawVertex[property] = vertexData.getUint8(offset) / 255.0;
-            offset += Uint8Array.BYTES_PER_ELEMENT;
-        }
+export function readRawVertex(offset: number, data: DataView, properties: Record<string,string>): [number,Record<string,number>] {
+    const vertex: Record<string,number>={};
+    for (const [name,type] of Object.entries(properties)) {
+        const value=type==='float'?data.getFloat32(offset,true):data.getUint8(offset)/255;
+        if (!Number.isFinite(value) || Math.abs(value)>65504) throw new Error('Non-finite or unrepresentable PLY value: '+name);
+        vertex[name]=value; offset+=type==='float'?4:1;
     }
-
-    return [offset, rawVertex];
+    return [offset,vertex];
 }
-
-export function nShCoeffs(sphericalHarmonicsDegree: number): number {
-    /* returns the expected number of spherical harmonics coefficients */
-    if (sphericalHarmonicsDegree === 0) {
-        return 1;
-    } else if (sphericalHarmonicsDegree === 1) {
-        return 4;
-    } else if (sphericalHarmonicsDegree === 2) {
-        return 9;
-    } else if (sphericalHarmonicsDegree === 3) {
-        return 16;
-    } else {
-        throw new Error(`Unsupported SH degree: ${sphericalHarmonicsDegree}`);
-    }
+export function nShCoeffs(degree: number): number {
+    if (!Number.isInteger(degree)||degree<0||degree>3) throw new Error('Unsupported SH degree: '+degree);
+    return (degree+1)**2;
 }
