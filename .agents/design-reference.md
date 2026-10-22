@@ -1,0 +1,5 @@
+# Metrics adapter reference
+
+The existing Tweakpane viewer is the reference for any later benchmark controls. The retained accepted screenshot `.evidence/cua/accepted.png` was visually inspected at 748x766. Source provenance is the preserved [UPenn starter](https://github.com/CIS5650-Fall-2025/Project5-WebGPU-Gaussian-Splat-Viewer). Reuse its compact Tweakpane action rows and existing status output. No layout or styling change is prepared.
+
+The benchmark adds deterministic owned PLY generation, CPU sort correctness/reference adapters, larger explicit readback, optional timestamp endpoints, and two action rows in the existing Tweakpane: Benchmark and Export benchmark. It reuses browser Performance/UserTiming and WebGPU query APIs. CUA observed these controls and the real GPU output at 748x766; retained screenshots are under the central metrics30 evidence/P16-iab-20261022 directory. No layout or style redesign was made. Numerical/offscreen acceptance is separate from visual proof, and the final narrow-screen layout remains unverified.

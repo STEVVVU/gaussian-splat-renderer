@@ -292,6 +292,8 @@ fn scatter(pass_: u32, lid: vec3<u32>, gid: vec3<u32>, wid: vec3<u32>, nwg: vec3
         let digit = extractBits(u_val, pass_ * rs_radix_log2, rs_radix_log2);
         // smem[lid.x] = digit;
         atomicStore(&smem[lid.x], digit);
+        // Publish every lane before the emulated subgroup reads its peers.
+        workgroupBarrier();
         var count = 0u;
         var rank = 0u;
         
@@ -306,6 +308,8 @@ fn scatter(pass_: u32, lid: vec3<u32>, gid: vec3<u32>, wid: vec3<u32>, nwg: vec3
         }
         
         kr[i] = (count << 16u) | rank;
+        // Finish peer reads before the next row (or zero_smem) overwrites them.
+        workgroupBarrier();
     }
     
     zero_smem(lid.x);   // now zeroing the smmem as we are now accumulating the histogram there
@@ -313,21 +317,27 @@ fn scatter(pass_: u32, lid: vec3<u32>, gid: vec3<u32>, wid: vec3<u32>, nwg: vec3
 
     // The final histogram is stored in the smem buffer
     for (var i = 0u; i < subgroup_count; i++) {
-        if subgroup_id == i {
-            for (var j = 0u; j < rs_scatter_block_rows; j++) {
+        for (var j = 0u; j < rs_scatter_block_rows; j++) {
+            var digit = 0u;
+            var prev = 0u;
+            var rank = 0u;
+            var count = 0u;
+            if subgroup_id == i {
                 let v = bitcast<u32>(kv[j]);
-                let digit = extractBits(v, pass_ * rs_radix_log2, rs_radix_log2);
-                let prev = histogram_load(digit);
-                let rank = kr[j] & 0xFFFFu;
-                let count = kr[j] >> 16u;
+                digit = extractBits(v, pass_ * rs_radix_log2, rs_radix_log2);
+                prev = histogram_load(digit);
+                rank = kr[j] & 0xFFFFu;
+                count = kr[j] >> 16u;
                 kr[j] = prev + rank;
-
-                if rank == count {
-                    histogram_store(digit, (prev + count));
-                }
-                
-                // TODO: check if the barrier here is needed
-            }            
+            }
+            // All active lanes must read the old count before its leader writes.
+            // Both barriers are outside the lane-dependent branch.
+            workgroupBarrier();
+            if subgroup_id == i && rank == count {
+                histogram_store(digit, (prev + count));
+            }
+            // Publish this row before any lane reads the next row's histogram.
+            workgroupBarrier();
         }
         workgroupBarrier();
     }

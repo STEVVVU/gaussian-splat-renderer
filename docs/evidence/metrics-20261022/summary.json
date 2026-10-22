@@ -1,0 +1,416 @@
+{
+  "scope": "Two complete CUA-driven browser campaigns on owned procedural scenes, seven alternating 20-frame repetitions per side and ten warm frames per side.",
+  "adapter": {
+    "info": {
+      "vendor": "intel",
+      "architecture": "xe-lpg",
+      "device": "",
+      "description": ""
+    },
+    "timestampQuery": true
+  },
+  "runs": [
+    {
+      "file": "production-campaign-2.json",
+      "sha256": "9a154ab0158928da111bf6d48faef6181feb2f9c59c3b371e547e631f3e18c40",
+      "finished_frames": 1680,
+      "cases": [
+        {
+          "count": 16384,
+          "width": 640,
+          "height": 360,
+          "max_image_error": 1,
+          "checks": {
+            "visible": true,
+            "unique": true,
+            "sorted": true,
+            "finite": true,
+            "cpuComposition": true,
+            "equalQuality": true
+          },
+          "logical_gpu_bytes": 6026580,
+          "sides": [
+            {
+              "name": "GPU radix sort",
+              "wall_p50_ms": 5.899999976158142,
+              "wall_p95_ms": 6.9000000059604645,
+              "gpu_p50_ms": 2.94912
+            },
+            {
+              "name": "CPU native typed-array sort with GPU roundtrip",
+              "wall_p50_ms": 6,
+              "wall_p95_ms": 7.200000017881393,
+              "gpu_p50_ms": null
+            }
+          ]
+        },
+        {
+          "count": 16384,
+          "width": 1280,
+          "height": 720,
+          "max_image_error": 1,
+          "checks": {
+            "visible": true,
+            "unique": true,
+            "sorted": true,
+            "finite": true,
+            "cpuComposition": true,
+            "equalQuality": true
+          },
+          "logical_gpu_bytes": 14320980,
+          "sides": [
+            {
+              "name": "GPU radix sort",
+              "wall_p50_ms": 6.9000000059604645,
+              "wall_p95_ms": 8.900000005960464,
+              "gpu_p50_ms": 4.521984
+            },
+            {
+              "name": "CPU native typed-array sort with GPU roundtrip",
+              "wall_p50_ms": 8,
+              "wall_p95_ms": 9.899999976158142,
+              "gpu_p50_ms": null
+            }
+          ]
+        },
+        {
+          "count": 131072,
+          "width": 640,
+          "height": 360,
+          "max_image_error": 1,
+          "checks": {
+            "visible": true,
+            "unique": true,
+            "sorted": true,
+            "finite": true,
+            "cpuComposition": true,
+            "equalQuality": true
+          },
+          "logical_gpu_bytes": 28085588,
+          "sides": [
+            {
+              "name": "GPU radix sort",
+              "wall_p50_ms": 14,
+              "wall_p95_ms": 16.099999994039536,
+              "gpu_p50_ms": 11.862016
+            },
+            {
+              "name": "CPU native typed-array sort with GPU roundtrip",
+              "wall_p50_ms": 14.400000005960464,
+              "wall_p95_ms": 16,
+              "gpu_p50_ms": null
+            }
+          ]
+        },
+        {
+          "count": 131072,
+          "width": 1280,
+          "height": 720,
+          "max_image_error": 1,
+          "checks": {
+            "visible": true,
+            "unique": true,
+            "sorted": true,
+            "finite": true,
+            "cpuComposition": true,
+            "equalQuality": true
+          },
+          "logical_gpu_bytes": 36379988,
+          "sides": [
+            {
+              "name": "GPU radix sort",
+              "wall_p50_ms": 16.900000005960464,
+              "wall_p95_ms": 19.30000001192093,
+              "gpu_p50_ms": 14.286848
+            },
+            {
+              "name": "CPU native typed-array sort with GPU roundtrip",
+              "wall_p50_ms": 17.5,
+              "wall_p95_ms": 19.099999994039536,
+              "gpu_p50_ms": null
+            }
+          ]
+        },
+        {
+          "count": 524288,
+          "width": 640,
+          "height": 360,
+          "max_image_error": 1,
+          "checks": {
+            "visible": true,
+            "unique": true,
+            "sorted": true,
+            "finite": true,
+            "cpuComposition": true,
+            "equalQuality": true
+          },
+          "logical_gpu_bytes": 103662932,
+          "sides": [
+            {
+              "name": "GPU radix sort",
+              "wall_p50_ms": 44.70000001788139,
+              "wall_p95_ms": 59.099999994039536,
+              "gpu_p50_ms": 41.877504
+            },
+            {
+              "name": "CPU native typed-array sort with GPU roundtrip",
+              "wall_p50_ms": 46.79999998211861,
+              "wall_p95_ms": 53,
+              "gpu_p50_ms": null
+            }
+          ]
+        },
+        {
+          "count": 524288,
+          "width": 1280,
+          "height": 720,
+          "max_image_error": 1,
+          "checks": {
+            "visible": true,
+            "unique": true,
+            "sorted": true,
+            "finite": true,
+            "cpuComposition": true,
+            "equalQuality": true
+          },
+          "logical_gpu_bytes": 111957332,
+          "sides": [
+            {
+              "name": "GPU radix sort",
+              "wall_p50_ms": 47.30000001192093,
+              "wall_p95_ms": 55.19999998807907,
+              "gpu_p50_ms": 44.498944
+            },
+            {
+              "name": "CPU native typed-array sort with GPU roundtrip",
+              "wall_p50_ms": 49.400000005960464,
+              "wall_p95_ms": 58.900000005960464,
+              "gpu_p50_ms": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "production-campaign-3.json",
+      "sha256": "50cdc4c5b49e2d2bd96554c4dad7186a996efbf9dc42d0df0b2f24f2557f447e",
+      "finished_frames": 1680,
+      "cases": [
+        {
+          "count": 16384,
+          "width": 640,
+          "height": 360,
+          "max_image_error": 1,
+          "checks": {
+            "visible": true,
+            "unique": true,
+            "sorted": true,
+            "finite": true,
+            "cpuComposition": true,
+            "equalQuality": true
+          },
+          "logical_gpu_bytes": 6026580,
+          "sides": [
+            {
+              "name": "GPU radix sort",
+              "wall_p50_ms": 5.899999976158142,
+              "wall_p95_ms": 6.9000000059604645,
+              "gpu_p50_ms": 3.145728
+            },
+            {
+              "name": "CPU native typed-array sort with GPU roundtrip",
+              "wall_p50_ms": 6,
+              "wall_p95_ms": 8.099999994039536,
+              "gpu_p50_ms": null
+            }
+          ]
+        },
+        {
+          "count": 16384,
+          "width": 1280,
+          "height": 720,
+          "max_image_error": 1,
+          "checks": {
+            "visible": true,
+            "unique": true,
+            "sorted": true,
+            "finite": true,
+            "cpuComposition": true,
+            "equalQuality": true
+          },
+          "logical_gpu_bytes": 14320980,
+          "sides": [
+            {
+              "name": "GPU radix sort",
+              "wall_p50_ms": 6.9000000059604645,
+              "wall_p95_ms": 9.099999994039536,
+              "gpu_p50_ms": 4.521984
+            },
+            {
+              "name": "CPU native typed-array sort with GPU roundtrip",
+              "wall_p50_ms": 8,
+              "wall_p95_ms": 9.900000005960464,
+              "gpu_p50_ms": null
+            }
+          ]
+        },
+        {
+          "count": 131072,
+          "width": 640,
+          "height": 360,
+          "max_image_error": 1,
+          "checks": {
+            "visible": true,
+            "unique": true,
+            "sorted": true,
+            "finite": true,
+            "cpuComposition": true,
+            "equalQuality": true
+          },
+          "logical_gpu_bytes": 28085588,
+          "sides": [
+            {
+              "name": "GPU radix sort",
+              "wall_p50_ms": 14.799999982118607,
+              "wall_p95_ms": 16.899999976158142,
+              "gpu_p50_ms": 12.058624
+            },
+            {
+              "name": "CPU native typed-array sort with GPU roundtrip",
+              "wall_p50_ms": 14.5,
+              "wall_p95_ms": 16,
+              "gpu_p50_ms": null
+            }
+          ]
+        },
+        {
+          "count": 131072,
+          "width": 1280,
+          "height": 720,
+          "max_image_error": 1,
+          "checks": {
+            "visible": true,
+            "unique": true,
+            "sorted": true,
+            "finite": true,
+            "cpuComposition": true,
+            "equalQuality": true
+          },
+          "logical_gpu_bytes": 36379988,
+          "sides": [
+            {
+              "name": "GPU radix sort",
+              "wall_p50_ms": 16.900000005960464,
+              "wall_p95_ms": 20.200000017881393,
+              "gpu_p50_ms": 14.286848
+            },
+            {
+              "name": "CPU native typed-array sort with GPU roundtrip",
+              "wall_p50_ms": 17,
+              "wall_p95_ms": 19,
+              "gpu_p50_ms": null
+            }
+          ]
+        },
+        {
+          "count": 524288,
+          "width": 640,
+          "height": 360,
+          "max_image_error": 1,
+          "checks": {
+            "visible": true,
+            "unique": true,
+            "sorted": true,
+            "finite": true,
+            "cpuComposition": true,
+            "equalQuality": true
+          },
+          "logical_gpu_bytes": 103662932,
+          "sides": [
+            {
+              "name": "GPU radix sort",
+              "wall_p50_ms": 44.79999998211861,
+              "wall_p95_ms": 67.59999999403954,
+              "gpu_p50_ms": 42.139648
+            },
+            {
+              "name": "CPU native typed-array sort with GPU roundtrip",
+              "wall_p50_ms": 46.39999997615814,
+              "wall_p95_ms": 51.900000005960464,
+              "gpu_p50_ms": null
+            }
+          ]
+        },
+        {
+          "count": 524288,
+          "width": 1280,
+          "height": 720,
+          "max_image_error": 1,
+          "checks": {
+            "visible": true,
+            "unique": true,
+            "sorted": true,
+            "finite": true,
+            "cpuComposition": true,
+            "equalQuality": true
+          },
+          "logical_gpu_bytes": 111957332,
+          "sides": [
+            {
+              "name": "GPU radix sort",
+              "wall_p50_ms": 47.79999998211861,
+              "wall_p95_ms": 60.30000001192093,
+              "gpu_p50_ms": 44.695552
+            },
+            {
+              "name": "CPU native typed-array sort with GPU roundtrip",
+              "wall_p50_ms": 50.099999994039536,
+              "wall_p95_ms": 59,
+              "gpu_p50_ms": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "source_sha256": {
+    "src/camera/camera-control.ts": "41c6237d3d95081e13dfdf223c6b53177c13397229eb9ed12645a58399f6292a",
+    "src/camera/camera.ts": "1126d0d5fba03df11bb59e332b2bd2986ff80668242cbcbe54fdcc299567d101",
+    "src/main.ts": "81b7741acc6396daa380e2b0f4eabfc1c645037c4b5ca5834c898a6dd598ac58",
+    "src/renderers/gaussian-renderer.ts": "ef2256f7b1f4edbcc6da0e0061178aed4a2683af76c15d0c88ddbfeb89f0d11e",
+    "src/renderers/gaussian-renderer.typecheck.ts": "c25429a3a1869641c38a625289800d86c342d37ee3e83c9c4be097f8f48ef79d",
+    "src/renderers/point-cloud-renderer.ts": "1458347f857acea40fc64415c057a6d28d49e07409a9393bf4ff85df22b85852",
+    "src/renderers/renderer.ts": "1d97c2a73f556655e17e8a10496dc2544fb8c5a2cdf5aa54c2f468b91e73576b",
+    "src/shaders/gaussian.wgsl": "e3101bf760d70147a594836bcf93507e4db9dd7953f0903e31d1637039f8182e",
+    "src/shaders/point_cloud.wgsl": "48f7c06afd5152b5edf95b73b98e25165a4c4c42975e1408e85f8914fca338d7",
+    "src/shaders/preprocess.wgsl": "621149ddc429ac9a806924222a391aab70ce57f435f86719a9406ec18d124a5c",
+    "src/shaders/present.wgsl": "964adb959d784a77aa070d529b55530f913b522b13ede1bc4640c8e939cef3d8",
+    "src/sort/radix_sort.wgsl": "337327937710fc0fadc53042d744ed306fcfc25de5a3906d95b9891e49b9730e",
+    "src/sort/sort.ts": "622b9e125570464f9986560f54c170d2c95a54a91e04847ca2a796a1a4c0643a",
+    "src/style.css": "8c4049ff732f89187e3bde167abb0b0221c33142a3a6c864dfdf222d730f4103",
+    "src/types.d.ts": "3291fe6eef5d0b726ef0a278e88603e16600b55f667f4a76f481fe2c933f3366",
+    "src/utils/benchmark.ts": "278ac4f3b27688d878b04657a13783fc9cb542fece6fe162e12c421aef992c8d",
+    "src/utils/load.ts": "d97a03be69d2cb7f59bd33608988b9323b4a15be66b2307174609b98b61c1321",
+    "src/utils/plyreader.ts": "56e0059e709996668fc991a9a1d15b1b42ba73fc97f493fd1033c4bad92e46f3",
+    "src/utils/simple-console.ts": "1e8af6f3abfff3dcac7e42190590e51feb87fa3483b449cc9aa8853c34a2fa11",
+    "src/utils/synthetic.ts": "187cb5bf14777385a95dfbccd3a9369b38cefefaca618026b1b550c72b79b152",
+    "src/utils/util.ts": "4f92f47db9480e604bd1f64bfa8ca5b4ec5dcd69a3aa2180fa31e41b7c0c52dd"
+  },
+  "limits": [
+    "Intel Xe-LPG browser adapter, not the RTX CUDA device.",
+    "CPU stable-sort arm includes GPU readback/upload and the same projection/draw/presentation.",
+    "Native GPU timestamps include presentation and interpass work; CPU GPU-time unavailable.",
+    "Per-frame empirical percentiles are not confidence bounds or display-refresh measurements.",
+    "No 650K/1080p, photorealistic-scene, vendor-baseline or portability claim.",
+    "Inherited cross-workgroup radix lookback depends on forward progress.",
+    "Logical allocation bytes are not physical peak VRAM."
+  ],
+  "post_measurement_type_only_cleanup": [
+    {
+      "file": "src/renderers/gaussian-renderer.typecheck.ts",
+      "measured_sha256": "c25429a3a1869641c38a625289800d86c342d37ee3e83c9c4be097f8f48ef79d",
+      "current_sha256": "0c056255f4f81d8f6d3376c4b3dfbee9c62d400fe6c84b719e3325af9a44a375"
+    }
+  ],
+  "post_measurement_note": "Removed a redundant compile-time resize alias only; runtime code remains byte-identical to both retained campaigns."
+}

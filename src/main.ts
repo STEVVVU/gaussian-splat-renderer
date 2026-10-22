@@ -19,6 +19,7 @@ import { assert } from './utils/util';
   }
   
   const device = await adapter.requestDevice({
+    requiredFeatures: adapter.features.has('timestamp-query') ? ['timestamp-query'] : [],
     requiredLimits: { 
       maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
       maxStorageBufferBindingSize: adapter.limits. maxStorageBufferBindingSize
@@ -29,6 +30,6 @@ import { assert } from './utils/util';
   assert(canvas !== null);
   const context = canvas.getContext('webgpu') as GPUCanvasContext;
   
-  init(canvas, context, device);
+  init(canvas, context, device, {info: {vendor:adapter.info.vendor,architecture:adapter.info.architecture,device:adapter.info.device,description:adapter.info.description}, timestampQuery: device.features.has('timestamp-query')});
   
 })();

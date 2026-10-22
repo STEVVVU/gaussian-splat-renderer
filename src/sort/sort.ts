@@ -12,6 +12,7 @@ import radix_sort_wgsl from './radix_sort.wgsl';
 import { align } from '../utils/util';
 
 export interface SortStuff {
+  allocationBytes: number,
   sort: (encoder: GPUCommandEncoder) => void,
   destroy: () => void,
   sort_info_buffer: GPUBuffer,
@@ -358,6 +359,7 @@ export function get_sorter(keysize: number, device: GPUDevice): SortStuff {
   };
 
   return {
+    allocationBytes: sort_info_buffer.size+sort_dispatch_indirect_buffer.size+histogram_buffer.size+ping_pong.reduce((sum,p)=>sum+p.sort_depths_buffer.size+p.sort_indices_buffer.size,0),
     sort_info_buffer,
     sort_dispatch_indirect_buffer,
     ping_pong,

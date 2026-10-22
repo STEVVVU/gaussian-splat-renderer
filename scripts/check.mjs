@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import './check-radix-sync.mjs';
 import { decodeHeader, readRawVertex, nShCoeffs } from '../src/utils/plyreader.ts';
 import { syntheticScene } from '../src/utils/synthetic.ts';
+import { benchmarkScene, cpuSort } from '../src/utils/benchmark.ts';
 const scene=syntheticScene();
 const [count,properties,data]=decodeHeader(scene);
 assert.equal(count,6); assert.equal(nShCoeffs(1),4);
@@ -27,3 +29,9 @@ const bits=new Uint32Array(new Float32Array([2.5,3,4]).buffer);
 const order=Array.from(bits, (b,i)=>({key:(~b)>>>0,index:i})).sort((a,b)=>a.key-b.key);
 assert.deepEqual(order.map(v=>v.index),[2,1,0]);
 console.log(JSON.stringify({checks:14,fixturePoints:count,visibleAtIdentity:4,expectedFarToNear:[2,0,1,3],referenceCovariancePixels:[xx,0,yy],status:'pass'},null,2));
+assert.deepEqual(Array.from(cpuSort(new Uint32Array([0xffffffff,1,1,0]),new Uint32Array([7,4,2,9]),4)),[9,4,2,7]);
+assert.throws(()=>cpuSort(new Uint32Array(1),new Uint32Array(1),2),/count/);
+const benchmark=benchmarkScene(16384);
+assert.equal(decodeHeader(benchmark)[0],16384);
+assert.deepEqual(new Uint8Array(benchmark),new Uint8Array(benchmarkScene(16384)));
+assert.throws(()=>benchmarkScene(100),/frozen/);
