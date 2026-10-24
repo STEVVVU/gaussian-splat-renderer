@@ -4,6 +4,124 @@ A WebGPU renderer for Gaussian PLY scenes. It projects 3D covariance into screen
 
 Built from the complete [UPenn CIS5650 Fall 2025 starter](https://github.com/CIS5650-Fall-2025/Project5-WebGPU-Gaussian-Splat-Viewer), commit `c0b02e3a5d529b6e84528263b76533f89ab49695`. The [assignment instructions](INSTRUCTION.md), upstream history, author credits and [MIT license](LICENSE) remain. [README.upstream.md](README.upstream.md) preserves the original overview. The starter supplied the camera, loader, point-cloud path and radix sorter; this adaptation implements the Gaussian rendering path and its verification.
 
+## Contents
+
+- [Architecture and execution guide](#architecture-and-execution-guide)
+- [Run](#run)
+- [Implementation](#implementation)
+- [Verification](#verification)
+- [Measured procedural workloads](#measured-procedural-workloads)
+- [Implementation map](IMPLEMENTATION.md)
+
+## Architecture and execution guide
+
+This project adds the Gaussian splat path to the inherited WebGPU viewer. The camera, PLY scene plumbing, point-cloud renderer, and four-pass radix sorter come from the starter; projection, compaction, shading, and diagnostics are project additions. A [PLY scene](#ply-scene) becomes packed GPU input; [covariance projection](#covariance-projection) turns it into sorted screen-space quads. [Spherical harmonics](#spherical-harmonics) supply view-dependent color.
+
+```mermaid
+flowchart LR
+  A["Browser and WebGPU"] --> B["Viewer and scene loader"]
+  B --> C["Gaussian renderer"]
+  C --> D["WebGPU compute and render"]
+  C --> E["Inherited point cloud path"]
+  D --> F["Canvas image"]
+```
+
+The browser owns input and canvas presentation. Viewer code validates a file and selects the Gaussian or inherited point-cloud renderer. The GPU executes the Gaussian path; this overview excludes the CPU diagnostic oracle.
+
+```mermaid
+flowchart TD
+  subgraph input["Scene input"]
+    A["PLY bytes"] --> B["Header and vertex validation"]
+  end
+  B -->|"invalid"| X["Report load error"]
+  B -->|"valid"| C["Pack Gaussian and SH buffers"]
+  subgraph gpu["GPU frame pipeline"]
+    C --> D["Project covariance and cull"]
+  D --> E["Compact survivors and depth keys"]
+  E --> F["Four-pass GPU radix sort"]
+  F --> G["Indirect alpha quad draw"]
+  G --> H["Present accumulation texture"]
+    I["Resize or replace scene"] --> J["Recreate texture or release old buffers"]
+  end
+```
+
+The loader rejects unsupported or truncated binary layouts before upload. Compute preprocessing removes invisible splats and emits depth keys; sorting orders compacted indices before the draw. Scene replacement releases old scene-owned buffers, while resize replaces the accumulation texture.
+
+| Subsystem | Responsibility and owned invariant | Source |
+| --- | --- | --- |
+| Viewer and camera | Selects renderer, updates camera uniforms, and coordinates scene lifetime. | [`main.ts`](src/main.ts), [`renderer.ts`](src/renderers/renderer.ts), [`camera.ts`](src/camera/camera.ts) |
+| PLY input | Validates binary little-endian records, finite half-range values, and count limits before packing. | [`plyreader.ts`](src/utils/plyreader.ts), [`load.ts`](src/utils/load.ts) |
+| Projection and culling | Converts 3D covariance to screen conic/radius and writes visible entries to sort storage. | [`preprocess.wgsl`](src/shaders/preprocess.wgsl) |
+| Sort | Provides the inherited GPU radix passes and survivor ordering. | [`sort.ts`](src/sort/sort.ts), [`radix_sort.wgsl`](src/sort/radix_sort.wgsl) |
+| Draw and presentation | Draws sorted quads with premultiplied far-to-near blending, then samples the float accumulation texture. | [`gaussian-renderer.ts`](src/renderers/gaussian-renderer.ts), [`gaussian.wgsl`](src/shaders/gaussian.wgsl), [`present.wgsl`](src/shaders/present.wgsl) |
+
+The normal frame path is:
+
+1. The viewer updates camera state and records projection and culling, which write the survivor count and depth keys.
+2. The radix sorter orders survivor indices. The renderer copies the count into an indirect draw argument.
+3. The draw shader expands each index into a quad and evaluates its conic Gaussian opacity. The presentation pass maps the accumulation texture to the canvas format.
+4. If the adapter or device is unavailable, startup reports that state. If input validation fails, loading stops before GPU packing; replacing a scene destroys its prior buffers.
+
+| Choice | Current implementation and rationale | Alternative and cost or reconsideration point |
+| --- | --- | --- |
+| GPU projection and sorting | Compute performs per-view projection and compaction, so ordinary frames do not read every depth to the CPU. | CPU sorting is retained as a diagnostic control; ordinary use would add readback and upload synchronization. |
+| Full-buffer PLY loading | The loader enforces a 256 MiB limit and one-million-point ceiling, then packs the complete scene. | Streaming would support larger files but needs incremental ownership and sorting. |
+| Indirect draw count | The GPU survivor count controls instance count without CPU readback. | A CPU-issued count needs synchronization and weakens the GPU-driven frame path. |
+| Float accumulation target | `rgba16float` preserves intermediate alpha composition before final presentation. | Direct canvas blending reduces storage but changes precision and composition; reconsider with matching image checks. |
+| Inherited radix lookback | The existing four-pass sorter is reused. | A portable multi-pass scan may avoid cross-workgroup forward-progress assumptions at additional dispatch and buffer cost. |
+
+These choices describe the current implementation; rationale is inferred from code. The inherited lookback sorter retains a cross-workgroup forward-progress portability limit. GPU counter profiling is unavailable, so the recorded frame timings do not identify a hardware bottleneck.
+
+<a id="ply-scene"></a>
+
+<details><summary>What is a PLY scene?</summary>
+
+A PLY scene is a point-cloud file with a header describing vertex fields. Here the loader accepts binary little-endian Gaussian records, such as position, opacity, quaternion, scale, and spherical-harmonic coefficients. ASCII PLY and files above 256 MiB are rejected.
+
+</details>
+
+<a id="covariance-projection"></a>
+
+<details><summary>What is covariance projection?</summary>
+
+Covariance describes a Gaussian's 3D spread and orientation. The preprocessing shader projects that shape through the camera Jacobian into a 2D conic and screen radius. The radius is bounded to a three-sigma footprint.
+
+</details>
+
+<a id="spherical-harmonics"></a>
+
+<details><summary>What are spherical harmonics?</summary>
+
+Spherical harmonics encode view-dependent color with coefficients evaluated against a direction. This renderer supports degrees zero through three; each degree adds coefficients and shader work.
+
+</details>
+
+<a id="radix-sort"></a>
+
+<details><summary>What is radix sorting?</summary>
+
+Radix sorting orders integer keys by processing digit groups. The inherited sorter orders complemented depth keys on the GPU so the draw visits visible splats far to near. Its lookback coordination has a portability limit across workgroups.
+
+</details>
+
+<a id="indirect-draw"></a>
+
+<details><summary>What is an indirect draw?</summary>
+
+An indirect draw reads vertex and instance counts from a GPU buffer. Here compute writes the visible-splat count into that buffer, avoiding CPU readback each frame.
+
+</details>
+
+<a id="premultiplied-alpha"></a>
+
+<details><summary>What is premultiplied alpha?</summary>
+
+Premultiplied alpha stores color already multiplied by opacity. The quad pass uses it with far-to-near blending so overlapping Gaussian contributions compose in the accumulation texture.
+
+</details>
+
+<a id="run"></a>
+
 ## Run
 
 Use Node.js 25.8 or later for the native TypeScript checks and a WebGPU-capable browser.
