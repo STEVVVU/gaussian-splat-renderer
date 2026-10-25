@@ -16,6 +16,264 @@ Built from the complete [UPenn CIS5650 Fall 2025 starter](https://github.com/CIS
 
 ## Architecture and execution guide
 
+<!-- execution-flow:start -->
+### Execution flow
+
+Start with the primary path, then expand a detailed workflow. Select a numbered node to see its operation, implementation techniques, and source. Solid arrows show the named control, data, or lifecycle handoff; dotted arrows show error paths. Separate entry points are named in each workflow.
+
+<a id="review-walkthrough"></a>
+
+#### Walk through one concrete example
+
+Load a supported Gaussian PLY scene in the renderer and render a frame using the active Gaussian pipeline.
+
+**Trace.** [Validate PLY and pack scene](#flow-step-admit-pack) → [Construct and atomically replace renderers](#flow-step-install-scene) → [Publish camera and viewport uniforms](#flow-step-camera-update) → [Project survivors and publish indirect count](#flow-step-project-compact) → [Run four stable radix scatters](#flow-step-sort-keys) → [Draw sorted Gaussian quads into float target](#flow-step-draw-composite) → [Convert float accumulation to canvas format](#flow-step-present-frame).
+
+**Result and boundary.** Visible splats are projected, compacted and sorted before alpha-blended drawing and presentation; the compatibility point mode bypasses the Gaussian frame path.
+
+<details>
+<summary>Implementation decisions to explain</summary>
+
+**Why compact projected survivors before sorting?** Sorting only surviving splats avoids carrying culled entries into the draw ordering; the compacted index list must remain consistent with the projected data.
+
+[Atomic survivor compaction and GPU counters](#technique-p16-gpu-survivor-compaction).
+
+**Why sort splats before alpha compositing?** The renderer uses ordered alpha-blended quads, so depth ordering is needed for the intended compositing sequence; ordering adds per-frame GPU work.
+
+[Four-pass GPU radix histogram, prefix, and scatter](#technique-p16-gpu-radix-sort) · [Conic raster thresholds and premultiplied alpha blending](#technique-p16-alpha-compositing).
+
+</details>
+
+#### Primary execution flow
+
+The viewer loads validated binary Gaussian PLY data, installs shared-camera renderers, then preprocesses, sorts, draws and presents the Gaussian frame. Selectable point mode, diagnostics and conditional profiling are shown as branches.
+
+```mermaid
+flowchart TD
+    n1["1. Validate PLY and pack scene"]
+    click n1 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-admit-pack" "Open step, techniques, and source" _top
+    n2["2. Construct and atomically<br/>replace renderers"]
+    click n2 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-install-scene" "Open step, techniques, and source" _top
+    n3["3. Publish camera and viewport<br/>uniforms"]
+    click n3 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-camera-update" "Open step, techniques, and source" _top
+    n4["4. Project survivors and publish<br/>indirect count"]
+    click n4 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-project-compact" "Open step, techniques, and source" _top
+    n5["5. Run four stable radix<br/>scatters"]
+    click n5 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-sort-keys" "Open step, techniques, and source" _top
+    n6["6. Draw sorted Gaussian quads<br/>into float target"]
+    click n6 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-draw-composite" "Open step, techniques, and source" _top
+    n7["7. Convert float accumulation to<br/>canvas format"]
+    click n7 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-present-frame" "Open step, techniques, and source" _top
+    n8["8. Render compatibility points"]
+    click n8 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-point-mode" "Open step, techniques, and source" _top
+    n1 -->|"loaded PointCloud"| n2
+    n2 -->|"installed scene uses shared camera<br/>state on later frames"| n3
+    n3 -->|"updated camera uniforms"| n4
+    n4 -->|"compacted keys, indices and dispatch<br/>count"| n5
+    n5 -->|"sorted indices and indirect instance<br/>count"| n6
+    n6 -->|"float accumulation texture"| n7
+    n2 -->|"selected pointcloud mode"| n8
+```
+
+**Detailed workflows.** [Gaussian scene load to presented frame](#flow-workflow-gaussian-frame) · [Selectable point-list mode](#flow-workflow-compatibility-point-mode) · [Opt-in diagnostics and benchmark evidence](#flow-workflow-diagnostics-and-profiling).
+
+<a id="flow-workflow-gaussian-frame"></a>
+
+<details>
+<summary>Gaussian scene load to presented frame</summary>
+
+Starts at the PLY loader; follows active GPU production path through presentation.
+
+```mermaid
+flowchart TD
+    n1["1. Validate PLY and pack scene"]
+    click n1 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-admit-pack" "Open step, techniques, and source" _top
+    n2["2. Construct and atomically<br/>replace renderers"]
+    click n2 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-install-scene" "Open step, techniques, and source" _top
+    n3["3. Publish camera and viewport<br/>uniforms"]
+    click n3 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-camera-update" "Open step, techniques, and source" _top
+    n4["4. Project survivors and publish<br/>indirect count"]
+    click n4 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-project-compact" "Open step, techniques, and source" _top
+    n5["5. Run four stable radix<br/>scatters"]
+    click n5 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-sort-keys" "Open step, techniques, and source" _top
+    n6["6. Draw sorted Gaussian quads<br/>into float target"]
+    click n6 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-draw-composite" "Open step, techniques, and source" _top
+    n7["7. Convert float accumulation to<br/>canvas format"]
+    click n7 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-present-frame" "Open step, techniques, and source" _top
+    n1 -->|"loaded PointCloud"| n2
+    n2 -->|"installed scene uses shared camera<br/>state on later frames"| n3
+    n3 -->|"updated camera uniforms"| n4
+    n4 -->|"compacted keys, indices and dispatch<br/>count"| n5
+    n5 -->|"sorted indices and indirect instance<br/>count"| n6
+    n6 -->|"float accumulation texture"| n7
+```
+
+</details>
+
+<a id="flow-workflow-compatibility-point-mode"></a>
+
+<details>
+<summary>Selectable point-list mode</summary>
+
+UI-selected compatibility renderer has its own draw path; it does not feed Gaussian compositing.
+
+```mermaid
+flowchart TD
+    n2["2. Construct and atomically<br/>replace renderers"]
+    click n2 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-install-scene" "Open step, techniques, and source" _top
+    n8["8. Render compatibility points"]
+    click n8 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-point-mode" "Open step, techniques, and source" _top
+    n2 -->|"selected pointcloud mode"| n8
+```
+
+</details>
+
+<a id="flow-workflow-diagnostics-and-profiling"></a>
+
+<details>
+<summary>Opt-in diagnostics and benchmark evidence</summary>
+
+Independent user-triggered diagnostics and benchmark actions. Each records its own frames; neither is called by the ordinary frame loop.
+
+```mermaid
+flowchart TD
+    n9["9. Read back GPU state and<br/>compare oracle"]
+    click n9 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-diagnostics" "Open step, techniques, and source" _top
+    n10["10. Profile stages when<br/>supported"]
+    click n10 href "https://github.com/STEVVVU/gaussian-splat-renderer#flow-step-timestamp-profile" "Open step, techniques, and source" _top
+```
+
+</details>
+
+#### Steps, techniques, and source
+
+These source traces cover the active scope below. They explain implementation behavior; benchmark results and their limits remain in the measurement sections.
+
+<a id="flow-step-admit-pack"></a>
+
+##### 1. Validate PLY and pack scene
+
+**Component.** src/utils/load.ts. PLY decodeHeader admits binary little-endian vertex data with bounded count/stride and required float fields. load validates every vertex before GPU allocation, rejects invalid quaternion/scale and adapter-limit overflow, then packs 11 Gaussian half values and SH coefficients into separate mapped buffers.
+
+**Techniques at this step.** [Bounded binary PLY validation](#technique-p16-binary-ply-admission) · [Half-precision GPU buffer packing](#technique-p16-half-buffer-packing) · [Spherical-harmonic coefficient reordering](#technique-p16-sh-coefficient-layout).
+
+**Source.** [`src/utils/plyreader.ts:1`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/utils/plyreader.ts#L1) · [`src/utils/load.ts:16`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/utils/load.ts#L16). [Back to execution flow](#execution-flow).
+
+<a id="flow-step-install-scene"></a>
+
+##### 2. Construct and atomically replace renderers
+
+**Component.** src/renderers/renderer.ts. The viewer creates both point-list and Gaussian renderers against the shared camera buffer under a GPU validation error scope. On validation error it destroys the new Gaussian and scene buffers and reports failure; otherwise it destroys the previous Gaussian/scene storage and installs both renderers, preserving the selected mode.
+
+**Techniques at this step.** [Shared camera uniforms and scene resource lifecycle](#technique-p16-camera-resource-lifecycle).
+
+**Source.** [`src/renderers/renderer.ts:289`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/renderers/renderer.ts#L289). [Back to execution flow](#execution-flow).
+
+<a id="flow-step-camera-update"></a>
+
+##### 3. Publish camera and viewport uniforms
+
+**Component.** src/camera/camera.ts. Resize and camera controls update view/projection matrices, inverses, viewport and focal length in one shared uniform buffer. The camera projection flips Y and uses near/far values 0.01 and 100.
+
+**Techniques at this step.** [Shared camera uniforms and scene resource lifecycle](#technique-p16-camera-resource-lifecycle).
+
+**Source.** [`src/camera/camera.ts:29`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/camera/camera.ts#L29) · [`src/camera/camera.ts:166`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/camera/camera.ts#L166). [Back to execution flow](#execution-flow).
+
+<a id="flow-step-project-compact"></a>
+
+##### 4. Project survivors and publish indirect count
+
+**Component.** src/shaders/preprocess.wgsl. Each input Gaussian is unpacked and rejected when behind/near, outside depth, scale is disabled, conic/radius is invalid, outside expanded viewport, or opacity is below threshold. Survivors receive Jacobian-projected covariance and view-dependent SH color; atomicAdd assigns compact slots, writes complemented positive-depth key and original index, and increments indirect dispatch count at block boundaries.
+
+**Techniques at this step.** [Half-precision GPU buffer packing](#technique-p16-half-buffer-packing) · [Spherical-harmonic coefficient reordering](#technique-p16-sh-coefficient-layout) · [Quaternion covariance projection with a perspective Jacobian](#technique-p16-covariance-jacobian) · [View-dependent spherical-harmonic color evaluation](#technique-p16-view-dependent-sh) · [Atomic survivor compaction and GPU counters](#technique-p16-gpu-survivor-compaction).
+
+**Source.** [`src/shaders/preprocess.wgsl:130`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/shaders/preprocess.wgsl#L130). [Back to execution flow](#execution-flow).
+
+<a id="flow-step-sort-keys"></a>
+
+##### 5. Run four stable radix scatters
+
+**Component.** src/sort/sort.ts. After projection has populated the counters reset before dispatch, the sorter records histogram zeroing and accumulation once, four-pass prefix once, then four alternating even/odd scatter passes. Scatter workgroups propagate partition prefixes by atomic lookback and use workgroup barriers around shared-memory peer exchange; sort writes ordered indices and depth keys for far-to-near blending.
+
+**Techniques at this step.** [Four-pass GPU radix histogram, prefix, and scatter](#technique-p16-gpu-radix-sort) · [Workgroup lookback prefix propagation](#technique-p16-lookback-prefix) · [Barrier-safe workgroup shared-memory exchange](#technique-p16-workgroup-barrier-exchange).
+
+**Source.** [`src/sort/sort.ts:355`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/sort/sort.ts#L355) · [`src/sort/radix_sort.wgsl:275`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/sort/radix_sort.wgsl#L275). [Back to execution flow](#execution-flow).
+
+<a id="flow-step-draw-composite"></a>
+
+##### 6. Draw sorted Gaussian quads into float target
+
+**Component.** src/renderers/gaussian-renderer.ts. The renderer copies the compact survivor count into the instance-count word of the indirect draw arguments. The vertex shader expands six triangle vertices per sorted index; fragments discard positive conic power and tiny alpha, then premultiplied source-over blending accumulates into rgba16float.
+
+**Techniques at this step.** [Indirect instanced-quad drawing](#technique-p16-indirect-draw) · [Conic raster thresholds and premultiplied alpha blending](#technique-p16-alpha-compositing).
+
+**Source.** [`src/renderers/gaussian-renderer.ts:69`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/renderers/gaussian-renderer.ts#L69) · [`src/renderers/gaussian-renderer.ts:77`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/renderers/gaussian-renderer.ts#L77) · [`src/shaders/gaussian.wgsl:26`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/shaders/gaussian.wgsl#L26). [Back to execution flow](#execution-flow).
+
+<a id="flow-step-present-frame"></a>
+
+##### 7. Convert float accumulation to canvas format
+
+**Component.** src/renderers/gaussian-renderer.ts. After the Gaussian pass, a fullscreen triangle texture-loads the rgba16float accumulation into the preferred canvas presentation format. Resize destroys and recreates the accumulation texture and its presentation bind group; renderFrame throws if resize has not initialized the view.
+
+**Techniques at this step.** [Float accumulation followed by presentation](#technique-p16-float-presentation).
+
+**Source.** [`src/renderers/gaussian-renderer.ts:53`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/renderers/gaussian-renderer.ts#L53) · [`src/renderers/gaussian-renderer.ts:64`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/renderers/gaussian-renderer.ts#L64) · [`src/shaders/present.wgsl:8`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/shaders/present.wgsl#L8). [Back to execution flow](#execution-flow).
+
+<a id="flow-step-point-mode"></a>
+
+##### 8. Render compatibility points
+
+**Component.** src/renderers/point-cloud-renderer.ts. When the UI selection is pointcloud, the selected renderer draws one point-list vertex per Gaussian using the shared camera and packed position. The point shader emits a fixed opaque yellow fragment; this is an independent selectable mode, not a stage in Gaussian compositing.
+
+**Techniques at this step.** [Point-list compatibility rendering](#technique-p16-point-list-rendering).
+
+**Source.** [`src/renderers/point-cloud-renderer.ts:37`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/renderers/point-cloud-renderer.ts#L37) · [`src/shaders/point_cloud.wgsl:27`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/shaders/point_cloud.wgsl#L27). [Back to execution flow](#execution-flow).
+
+<a id="flow-step-diagnostics"></a>
+
+##### 9. Read back GPU state and compare oracle
+
+**Component.** src/renderers/gaussian-renderer.ts. The opt-in diagnostic path caps ordinary reads at 4096 Gaussians, copies counters/indices/projected splats/keys and image rows into map-readable buffers, then reports sampled pixel error against a CPU conic-compositing calculation. referenceFrame separately reads projected keys/indices, CPU-sorts pairs, uploads ordered indices and draws; the script checks retained synthetic-scene diagnostics against an independent covariance, SH and image oracle.
+
+**Techniques at this step.** [GPU readback with an independent CPU image oracle](#technique-p16-independent-image-oracle).
+
+**Source.** [`src/renderers/gaussian-renderer.ts:111`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/renderers/gaussian-renderer.ts#L111) · [`src/renderers/gaussian-renderer.ts:81`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/renderers/gaussian-renderer.ts#L81) · [`scripts/check-gpu-readback.mjs:8`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/scripts/check-gpu-readback.mjs#L8). [Back to execution flow](#execution-flow).
+
+<a id="flow-step-timestamp-profile"></a>
+
+##### 10. Profile stages when supported
+
+**Component.** src/main.ts. Benchmark creates timestamp queries only when the device advertises timestamp-query, passes them to Gaussian frame recording, resolves four values and derives GPU stage durations; without the feature GPU timing is null while wall-clock roundtrip remains available.
+
+**Techniques at this step.** [Conditional timestamp-query profiling](#technique-p16-conditional-timestamp-query).
+
+**Source.** [`src/main.ts:21`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/main.ts#L21) · [`src/renderers/renderer.ts:168`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/renderers/renderer.ts#L168) · [`src/renderers/renderer.ts:204`](https://github.com/STEVVVU/gaussian-splat-renderer/blob/splatforge/src/renderers/renderer.ts#L204). [Back to execution flow](#execution-flow).
+
+<details>
+<summary>Scope and subsystem coverage</summary>
+
+Active Gaussian PLY-to-frame path, selectable inherited fixed-yellow point-list renderer, shared viewer camera/scene installation, timestamp benchmark instrumentation and retained diagnostic CPU comparison path; excludes unrelated preserved upstream demo assets.
+
+- **PLY admission and packing.** Header/vertex validation and half plus SH buffer packing are in load. [Step 1](#flow-step-admit-pack).
+- **Camera projection and survivor generation.** Camera uniforms feed covariance projection, SH evaluation and atomic survivor counters. [Step 3](#flow-step-camera-update), [Step 4](#flow-step-project-compact).
+- **Survivor ordering.** Sort wrapper dispatches histogram, prefix and four scatters; WGSL implements lookback and barrier-protected exchange. [Step 5](#flow-step-sort-keys).
+- **Quad rendering and presentation.** Sorted indirect quads blend into float accumulation then fullscreen present. [Step 6](#flow-step-draw-composite), [Step 7](#flow-step-present-frame).
+- **Camera and scene lifecycle.** Install swaps scene renderers; camera uniforms are shared and resize recreates float target. [Step 2](#flow-step-install-scene), [Step 3](#flow-step-camera-update), [Step 7](#flow-step-present-frame).
+- **Diagnostic validation.** Readback and CPU reference/oracle path is explicitly opt-in. [Step 9](#flow-step-diagnostics).
+- **Compatibility point-cloud renderer.** Selected point renderer draws one fixed-yellow point per input. [Step 8](#flow-step-point-mode).
+- **Benchmark instrumentation.** Benchmark gates query creation on feature availability. [Step 10](#flow-step-timestamp-profile).
+
+Outside this flow audit:
+
+- `README.upstream.md and preserved upstream demo assets outside the active viewer path`. Reference and retained source files do not establish an active runtime handoff in the current viewer.
+
+</details>
+
+<!-- execution-flow:end -->
+
+<details>
+<summary>Subsystem technique index</summary>
+
 ### Subsystem map
 
 Select a subsystem in the diagram to open its techniques, tradeoffs, and code references. The numbered links provide the same navigation. This map groups components; the execution diagrams show their runtime flow.
@@ -51,6 +309,8 @@ flowchart LR
 8. [Benchmark instrumentation](#subsystem-benchmark-instrumentation)
 
 This project adds the Gaussian splat path to the inherited WebGPU viewer. The camera, PLY scene plumbing, point-cloud renderer, and four-pass radix sorter come from the starter; projection, compaction, shading, and diagnostics are project additions. A [PLY scene](#ply-scene) becomes packed GPU input; [covariance projection](#covariance-projection) turns it into sorted screen-space quads. [Spherical harmonics](#spherical-harmonics) supply view-dependent color.
+
+</details>
 
 <details>
 <summary>Expand flow diagram 1</summary>
